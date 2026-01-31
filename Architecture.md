@@ -1,0 +1,41 @@
+# Architecture
+
+## Intent
+
+Provide a **base Azure VM substrate** with:
+
+- Immutable-ish OS layer (defined via Bicep)
+- Persistent data disk for long-lived state
+- Minimal, auditable network surface
+
+This template **does not** deploy applications.  
+Applications (e.g. OpenClaw) are added later as a separate layer.
+
+## Components
+
+- **Virtual Network**
+  - Single VNet with one subnet for the VM
+
+- **Network Security Group**
+  - Inbound SSH (port 22) restricted to a configurable source (e.g. your IP)
+  - All other inbound blocked by default
+
+- **Public IP + NIC**
+  - Static Public IP
+  - NIC associated with subnet + NSG
+
+- **Virtual Machine**
+  - Ubuntu 22.04 LTS (Gen2)
+  - SSH key-based access only
+  - VM size configurable (default: `Standard_B2s`)
+
+- **Data Disk**
+  - Managed disk (configurable size)
+  - Attached as `LUN 0`
+  - Intended to be mounted at e.g. `/data`
+
+## Governance Notes
+
+- **Simulation ≠ execution**: this template is design-time only; verify before use.
+- **Substrate**: this repo defines the *infra substrate* only.
+- **Applications**: deployed as a separate layer (scripts, Ansible, cloud-init, etc.).
