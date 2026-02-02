@@ -1,16 +1,18 @@
 # Substrate_Compute
-<<<<<<< HEAD
-=======
-Baseline Azure VM substrate defined in Bicep, with immutable OS, persistent data disk, and clear separation between infrastructure and applications. Designed as a governed foundation for future workloads (e.g. OpenClaw).
->>>>>>> 23147a2440e171469b44d4353a1f9567b582eb48
 
 This repository defines a governed Azure VM substrate intended for repeatable, low-cost compute nodes that can be safely extended with application layers (e.g. OpenClaw) without compromising base integrity.
+
+The design prioritises:
+- Determinism
+- Auditability
+- Low operational cost
+- Clear separation between infrastructure substrate and application logic
 
 ---
 
 ## Reference VM: vm-Substrate-Compute-Base
 
-**vm-Substrate-Compute-Base** is the canonical golden base VM for this repository.
+**vm-Substrate-Compute-Base** is the canonical golden base VM defined by this repository.
 
 It is designed to be:
 - Low-cost and resource-conscious (e.g. Azure B1s / B2s)
@@ -25,129 +27,28 @@ All application workloads are deployed from its captured image.
 
 ---
 
-## Architecture Overview
+## Scope
 
-### Infrastructure Substrate
+This repository defines:
+- Core Azure infrastructure (VM, disks, network, NSG)
+- A clean, reproducible base operating system
+- Image lifecycle and governance contract
 
-- Azure Virtual Machine
-- Ubuntu Server 22.04 LTS
-- Disposable OS disk
-- Persistent data disk (mounted at `/data`)
-- NSG restricted to SSH (source IP parameterised)
-- No application logic baked into the base image
+This repository does **not** define:
+- Application logic
+- Agent behaviour
+- Long-running business processes
 
-### VM Variants
-
-#### vm-Substrate-Compute-Base
-- Deployed from the Ubuntu marketplace image
-- Tuned for low-end hardware:
-  - Swapfile configured (2–4 GB)
-  - Reduced swappiness
-  - Journald/log rotation caps
-  - Unnecessary services disabled
-- Generic tooling installed only:
-  - git, curl, wget
-  - build-essential
-  - htop, tmux
-  - Node.js via nvm (no global npm installs)
-- Deprovisioned and captured as a managed image or SIG image
-
-#### Derived Application VMs
-Examples:
-- vm-substrate-compute-openclaw-ops-01
-- vm-substrate-compute-dev-01
-
-Characteristics:
-- Deployed **from the vm-Substrate-Compute-Base image**
-- Application installed via bootstrap scripts or cloud-init
-- Use systemd for PID/service management
-- May expose additional ports as required
-- Can be safely destroyed and recreated
+Those belong in downstream layers.
 
 ---
 
-## Image Lifecycle
+## Intended Usage
 
-1. Deploy **vm-Substrate-Compute-Base** from the Ubuntu 22.04 LTS marketplace image using this template.
-2. Apply low-end tuning:
-   - OS updates
-   - Swapfile creation and tuning
-   - Service trimming
-   - Basic hardening and observability tooling
-3. Clean the VM:
-   - Remove temp files and logs
-   - Ensure no secrets or personal SSH keys remain
-4. Deprovision the VM (`waagent -deprovision+user`)
-5. Capture the VM as:
-   - A managed image, or
-   - A Shared Image Gallery version
-6. Update IaC to reference the new image ID
-7. Destroy the build VM
+1. Deploy **vm-Substrate-Compute-Base** from the Ubuntu marketplace image.
+2. Apply low-end tuning and generic tooling.
+3. Capture the VM as an image.
+4. Deploy application VMs from that image.
+5. Periodically rebuild the base image to refresh patches and tooling.
 
-This process is repeated periodically to refresh patches and base tooling.
-
----
-
-## Bicep Design Contract
-
-The Bicep template supports two modes:
-
-- **Base build mode**
-  - `sourceImageId` left empty
-  - Ubuntu marketplace image used
-  - Produces vm-Substrate-Compute-Base
-
-- **Application mode**
-  - `sourceImageId` provided
-  - VM created from the captured base image
-  - Application bootstrap applied
-
-### Required Parameters (conceptual)
-
-- `vmName`
-- `vmSize` (default: Standard_B2s)
-- `sourceImageId` (optional)
-- `sshSourceAddressPrefix`
-
-This keeps infrastructure deterministic and prevents snowflake VMs.
-
----
-
-## Application Layer: OpenClaw (Out of Scope for Base)
-
-OpenClaw is treated as a **first-class application layer**, not part of the base substrate.
-
-Responsibilities of the application layer:
-- Install OpenClaw and dependencies
-- Register systemd services
-- Manage its own processes and logs
-- Observe host health and resource usage
-- Interact with IaC, GitHub Actions, and future DAO workflows
-
-OpenClaw is installed only on VMs derived from the **vm-Substrate-Compute-Base** image.
-
----
-
-## Naming Conventions
-
-### Base Build
-- Resource Group: `rg-substrate-compute-base`
-- Build VM: `vm-substrate-compute-base-build`
-- Image: `img-substrate-compute-base`
-
-### Derived VMs
-- `vm-substrate-compute-openclaw-ops-01`
-- `vm-substrate-compute-openclaw-dev-01`
-
----
-
-## Design Contract (Non-Negotiable)
-
-- vm-Substrate-Compute-Base:
-  - Is never an application host
-  - Is disposable after image capture
-  - Exists solely to define a clean substrate
-
-- All intelligence, agents, and workloads live **above** the base.
-
-This preserves auditability, reversibility, and long-term maintainability.
+This pattern prevents snowflake VMs and enables controlled evolution.
